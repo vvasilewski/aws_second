@@ -10,11 +10,14 @@
  * http://sailsjs.org/#/documentation/reference/sails.config/sails.config.sockets.html
  */
 
-var gm = require('gm');
+//var gm = require('gm');
+var gm = require('gm').subClass({imageMagick: true});
+//var gm = require('imagemagick');
 var util = require('util');
 buffer = require('buffer');
 var http = require('http');
 mime = require('mime');
+var easyim = require('easyimage');
 
 module.exports.sockets = {
     /***************************************************************************
@@ -29,15 +32,16 @@ module.exports.sockets = {
     onConnect: function (session, socket) {
         var io = sails.io;
         var util = require('util');
+        var path;
 
-        socket.roomName = 'firma';
+        socket.roomName = 'wasilewski';
 
         console.log('connect');
 
         socket.on('checkQueue', function (name, fn) {
             console.log('checkQueue');
             var params = {
-                QueueUrl: 'https://sqs.us-east-1.amazonaws.com/361856646713/IMAGE_ROTATE'
+                QueueUrl: 'https://sqs.us-east-1.amazonaws.com/833679955307/IMAGE_ROTATE'
             };
 
             var aw = aws.setService();
@@ -50,49 +54,111 @@ module.exports.sockets = {
                     var io = sails.io;
                     var s3 = awsS3.getService();
 
+
                     var callback = function (path) {
+                      //console.log(path);
                         sqs.purgeQueue(params, function (err, data) {
                             if (err) {
                                 console.log(err, err.stack); // an error occurred
                             } else {
                                 console.log('queue removed');
+                                //console.log(path);
                                 socket.emit('colorized', path);
+
                             }
                         });
                     };
 
                     http.get('http://s3.amazonaws.com/' + data.Messages[0].Body, function (res) {
+                    //http.get('http://s3-website-us-east-1.amazonaws.com/' + data.Messages[0].Body, function (res) {
+                    //http.get('http://s3.amazonaws.com/wasilewskibucket/25f74cd3-77be-447e-b758-deda98a6fdfb.jpg', function (res) {
+                      console.log(data.Messages[0].Body);
+                      console.log(res.statusCode);
+                      console.log(data.Messages[0]);
+
+                      //console.log(res);
+
                         if (res.statusCode != 200) {
-                            console.log("Err");
+                            console.log('Err problem with getting in sockets.js>');
                         } else {
-                            gm(res).colorize(200, 200, 256)
-                                    .autoOrient()
-                                    .stream(function (err, stdout, stderr) {
+                          //console.log(res._header);
+                          //console.log(res);
+
+                          console.log('Before colorized');
+                          path = res.path;
+                         /* gm('/path/to/image.jpg')
+                            .resize(353, 257)
+                            .autoOrient()
+                            .write(writeStream, function (err) {
+                              if (!err) console.log(' hooray! ');
+                            });
+                          */
+
+                            //gm('http://s3.amazonaws.com/' + data.Messages[0].Body)
+                              //gm(res)
+                                //.colorize(0/0/50)
+                              //gm('assets/images/gtv.jpg')
+                                //.resize(353, 257)
+                                //.colorize(200, 200, 256)
+                            //gm(res).colorize(200, 200, 256)
+                                //.autoOrient()
+                             gm(res)
+                               .colorize(7,21,50)
+                               .resize('800x800')
+                               .stream(function (err, stdout, stderr) {
 
                                         if (err) {
                                             callback('err');
                                             return;
                                         }
-
+                                        //console.log('This is path:');
+                                        //console.log(res);
+                                        //console.log('End of path');
+                                        console.log('Colorized is done');
                                         var name = data.Messages[0].Body.split("/");
+                                        //console.log('What is in dataMassage[0]: ' + name);
+
                                         var buf = new Buffer(0);
 
-                                        stdout.on('data', function (d) {
-                                            buf = Buffer.concat([buf, d]);
+                                 stdout.on('data', function (d) {
+
+                                          console.log("stdout.data");
+                                          //buf.maxBuffer(64);
+                                          //Buffer.isBuffer(buf);
+                                          buf = Buffer.concat([buf, d]);
+                                          console.log('What is in buf, after concat: ' + buf.size);
+                                          console.log('Concat is done');
+                                          callback(buf);
                                         });
-                                        stdout.on('end', function () {
+                                        stdout.on('end', function (data) {
 
                                             var data = {
                                                 Bucket: name[0],
                                                 Key: name[1],
                                                 Body: buf,
-                                                ContentType: mime.lookup(name[1])
-                                            };
+                                                ContentType: "image/jpeg",
+                                                ContentEncoding: "base64",
+                                                ACL: "public-read"
 
-                                            s3.putObject(data, function (err, resp) {
-                                                console.log("Done");
-                                                callback(name[1]);
+                                              //ContentType: mime.lookup(name[1])
+                                            };
+                                          var options ={
+                                            partSize: 10 * 1024 * 1024, 
+                                            queueSize: 1}
+                                          
+                                          console.log('**data.bucket:' + name[0] );
+                                          console.log('**data.key'+ name[1]);
+                                          console.log('**rest: '+ name[2] + name[3] + name[4] + name[5]);
+                                          //console.log('**data.body' + buf);
+                                          console.log('**data.contenttype' + mime.lookup(name[1]));
+                                          console.log('end is Done, waiting for put and finish');
+
+                                            s3.putObject(data, options, function (err, resp) {
+                                              console.log('What is in resp when putting to s3:' + resp);
+                                            console.log('Done' + name[1]);
+                                               
                                             });
+
                                         });
                                     });
                         }

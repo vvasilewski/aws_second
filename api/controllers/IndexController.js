@@ -32,9 +32,9 @@ module.exports = {
                 });
 
 
-//        return res.json({
+       return res.json({
 //            todo: 'rotate() is not implemented yet!'
-//        });
+       });
     }
 };
 
